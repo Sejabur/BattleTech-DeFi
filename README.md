@@ -1,48 +1,41 @@
-# ⚔️ BattleTech-DeFi: The Algorithmic Rebalancing Protocol
+# BattleTech-DeFi: Algorithmic Liquidity Rebalancing Protocol
+*Automated cross-pool capital efficiency protocol using volume-metric indicators and multi-version DEX routing.*
 
-**BattleTech-DeFi** is a sophisticated DeFi backend that automates liquidity management between token pairs. By utilizing real-time **Trading Volume** as a performance metric, the protocol systematically rebalances capital to favor the highest-performing assets, optimizing market support and price stability.
+> **Note on Proprietary Intellectual Property & Status:** This repository contains an early-stage developer prototype and reference implementation. The finalized, optimized, and fully audited production deployment was built for a private client and remains proprietary. As an open-source reference prototype, this codebase may contain unresolved edge cases or development bugs. It is intended exclusively for architectural demonstration and evaluation; comprehensive third-party audits are required prior to any production use.
 
----
+## Core Protocol Lifecycle & Execution Matrix
+Detail the sequence within `executeBattle`:
+1. **State Ingestion & Allocation:** The system calculates the target tokens to liquidate based on the input `battleTax` (scaled via `DIVISOR = 10000`) relative to the underperforming pool’s state.
+2. **Multi-Protocol Swapping via Universal Router:** Capital is routed out of the losing pool into native $ETH$ using the Uniswap Universal Router. Based on the registered pool protocol version, it dynamically executes standard pathing for V2, bytes-encoded paths for V3, or action-based commands (`Actions.SWAP_EXACT_IN_SINGLE`) paired with dynamic `tickSpacing` selection for V4.
+3. **Algorithmic Capital Distribution:** The contract splits the recovered native $ETH$ into three distinct components based on configured storage state limits:
+   - **Platform Allocations:** Disbursed to the `admin` address.
+   - **Incentive Yield:** Disbursed to the designated `highestBidder`.
+   - **Pool Staking Rewards:** Injected into the winning pool's reward accounting via an automated staking share algorithm (`accRewardPerShare`).
 
-### ⚙️ How the Rebalancing Works
+## Mathematical Architecture
+$$ETH_{\text{fees}} = \frac{ETH_{\text{received}} \times (\text{platformFee} + \text{highestBidderFee} + \text{poolFee})}{\text{DIVISOR}}$$
 
-The protocol operates on a transparent, volume-based execution model. When the rebalancing sequence is triggered, the system performs a multi-stage transaction:
+$$ETH_{\text{remaining}} = ETH_{\text{received}} - ETH_{\text{fees}}$$
 
-1. **Liquidation Phase**: The protocol identifies the pool with lower trading volume and liquidates a predefined percentage () into native ETH.
-2. **Fee Allocation**: The acquired ETH is distributed according to fixed parameters:
-* **Platform Fee**: Allocated to the administrative treasury.
-* **Contributor Incentive**: Awarded to the highest bidder/top contributor.
-* **Reward Storage**: Deposited into the active pool’s ETH storage for retroactive distribution.
+The $ETH_{\text{remaining}}$ is immediately passed into `_phase2Buy` to build a price floor for the winning token asset.
 
+## Technical Specification Matrix
 
-3. **Buyback & Support**: All remaining ETH is used to execute a buyback of the high-volume token, strengthening its price floor and liquidity.
+| Component | Technical Implementation & Logic |
+| :--- | :--- |
+| **Uniswap Universal Router** | Acts as the unified execution hub executing multi-protocol swaps via complex command bytes mapping. |
+| **DEX Routing Engine** | Natively handles `V2_SWAP_EXACT_IN`, `V3_SWAP_EXACT_IN` (concentrated liquidity), and `V4_SWAP` single actions. |
+| **Permit2 Integration** | Automates a two-tier infinite token approval workflow inside `registerPool` using `IPermit2`. |
+| **Staking Mechanism** | Implements a scalable `accRewardPerShare` accounting method to track individual contributor reward debt fractions. |
+| **Security Architecture** | Utilizes OpenZeppelin `SafeERC20` utilities, inherited `ReentrancyGuard` protection, and administrative modifiers. |
 
-### 💎 Key Benefits for Contributors
+## Deployment Verification & Environment
+**Live Testnet Deployment:** [0x49e5f916f716de41970d30ea0e69cb29cf497624](https://sepolia.basescan.org/address/0x49e5f916f716de41970d30ea0e69cb29cf497624)
 
-* **Yield Generation**: Earn a share of protocol fees by participating in the liquidity ecosystem.
-* **Retroactive Incentives**: Surplus funds are systematically stored and distributed to long-term contributors based on historical data.
-* **Strategic Staking**: Support high-performing tokens to benefit from automated buyback cycles.
-
----
-
-### 🛠️ Technical Architecture
-
-This protocol is engineered for deep integration across the Uniswap ecosystem, providing seamless execution regardless of the liquidity version.
-
-| Feature | Uniswap V2 | Uniswap V3 | Uniswap V4 |
-| --- | --- | --- | --- |
-| **Logic** | Static Pathing | Precision Bytes Routing | **Action-Based Encoding** |
-| **Liquidity** | Standard Pairs | Concentrated Liquidity | **Custom Hooks & Singletons** |
-| **Execution** | Router-based | Optimized Routing | **Flash Accounting** |
-
-### 📊 Mathematical Model
-
-The protocol ensures complete transparency in fund allocation. The net capital available for token support is calculated as:
-$$ETH_{buyback} = ETH_{total} - (Fee_{platform} + Fee_{bidder} + Fee_{pool})$$
----
-
-### 🌐 Live on Testnet
-
-A stable version (not the final, as I can't disclose the client's project) of the contract is currently deployed on **Base Sepolia**. You can review the contract logic and transaction history on the explorer:
-
-**Contract Address:** [`0x49e5f916f716de41970d30ea0e69cb29cf497624`](https://www.google.com/search?q=%5Bhttps://sepolia.basescan.org/address/0x49e5f916f716de41970d30ea0e69cb29cf497624%5D(https://sepolia.basescan.org/address/0x49e5f916f716de41970d30ea0e69cb29cf497624))
+**Compilation Framework:**
+This project utilizes the Foundry framework. To compile and test the execution sequences locally:
+```bash
+forge build
+forge test
+```
+For complex configurations and advanced scripting, refer directly to the official [Foundry Book](https://book.getfoundry.sh/).
